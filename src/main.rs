@@ -1,12 +1,9 @@
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, unused_imports)]
 
-use crate::equation::LinearEquation;
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use graph::Graph;
-use prelude::Equation;
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style},
@@ -14,15 +11,19 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
-use state::{App, Screen};
-use std::io::Error as IoError;
-use var::Variable;
+use rodio::{source::Source, Decoder, OutputStream, OutputStreamHandle};
+use std::{collections::HashMap, fs::File, path::Path};
+use std::{
+    io::{BufReader, Error as IoError, Stderr},
+    path::PathBuf,
+};
 
-mod equation;
-mod graph;
-mod prelude;
+mod drums;
 mod state;
-mod var;
+mod ui;
+mod widgets;
+
+use state::{App, Screen};
 
 fn main() -> Result<(), IoError> {
     enable_raw_mode()?;
@@ -34,9 +35,7 @@ fn main() -> Result<(), IoError> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let mut app: App<LinearEquation> = state::App::default();
-    let equation = LinearEquation::new(4.5f64, 2.0f64);
-    app.set_equation(equation);
+    let mut app: App = App::default();
 
     let _ = run_app(&mut terminal, &mut app);
 
@@ -52,49 +51,76 @@ fn main() -> Result<(), IoError> {
     Ok(())
 }
 
-pub fn run_app<B: Backend, E: Equation>(
-    term: &mut Terminal<B>,
-    app: &mut App<E>,
+pub fn run_app(
+    term: &mut Terminal<CrosstermBackend<Stderr>>,
+    app: &mut App,
 ) -> std::io::Result<bool> {
     loop {
-        term.draw(|frame| render_ui(frame, app))?;
+        term.draw(|frame| ui::render_ui(frame, app))?;
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 continue;
             }
-            match key.code {
+            if key.code == KeyCode::Char('q') {
+                app.screen = Screen::Exiting;
+                return Ok(false);
+            }
+            match app.screen {
+                Screen::FileBrowser => match key.code {
+                    KeyCode::Up => app.file_browser.up(),
+                    KeyCode::Down => app.file_browser.down(),
+                    _ => app.file_browser.handle_event(key.code),
+                },
+                Screen::KeyBinding => {}
+                Screen::AddSample => {}
+                Screen::Home => match key.code {
+                    KeyCode::Char('a') => {
+                        app.screen = Screen::FileBrowser;
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+            /*match key.code {
                 KeyCode::Char('q') => {
                     app.screen = Screen::Exiting;
                     return Ok(false);
                 }
+                KeyCode::Char('a') => {
+                    app.screen = Screen::FileBrowser;
+                }
+                KeyCode::Down => match app.screen {
+                    Screen::FileBrowser => {
+                        app.file_browser.handle_event(KeyCode::Down);
+                    }
+                    _ => {}
+                },
+                KeyCode::Char(c) => match app.screen {
+                    Screen::Home => {
+                        app.drum_machine.play_source(c);
+                    }
+                    Screen::FileBrowser => {
+                        app.file_browser.handle_event(key.code);
+                        if let Some(selected_path) = app.file_browser.selected_path() {
+                            app.selected_sample_path = Some(selected_path);
+                            app.screen = Screen::KeyBinding;
+                        }
+                    }
+                    Screen::KeyBinding => {}
+                    Screen::AddSample => {
+                        if let Some(_) = app.load_sample_key {
+                            app.text_input.handle_event(key.code);
+                            app.load_sample_path = Some(app.text_input.content.clone());
+                        } else {
+                            app.load_sample_key = Some(c);
+                        }
+                    }
+                    _ => {
+                        app.drum_machine.play_source(c);
+                    }
+                },
                 _ => {}
-            }
+            }*/
         }
-    }
-}
-
-pub fn render_ui<B: Backend, E: Equation>(frame: &mut Frame<B>, app: &mut App<E>) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(1),
-            Constraint::Length(3),
-        ])
-        .split(frame.size());
-
-    let title_block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default());
-    let title = Paragraph::new(Text::styled("Quark", Style::default().fg(Color::Magenta)))
-        .block(title_block);
-
-    frame.render_widget(title, chunks[0]);
-
-    if let Some(equation) = &app.equation {
-        let x_values: Vec<f64> = (-10..=10).map(|x| x as f64).collect();
-        let graph = Graph::new(equation.clone(), x_values);
-
-        frame.render_widget(graph, chunks[1]);
     }
 }
