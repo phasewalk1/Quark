@@ -4,16 +4,18 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-pub struct DrumMachine {
+pub struct QuickSampler {
+    stream: OutputStream,
     stream_handle: OutputStreamHandle,
     sources: HashMap<char, PathBuf>,
 }
 
-impl DrumMachine {
-    pub fn new() -> DrumMachine {
-        let (_, stream_handle) = OutputStream::try_default().unwrap();
+impl QuickSampler {
+    pub fn new() -> QuickSampler {
+        let (stream, stream_handle) = OutputStream::try_default().unwrap();
         let sources = HashMap::new();
-        DrumMachine {
+        QuickSampler {
+            stream,
             stream_handle,
             sources,
         }
@@ -23,7 +25,7 @@ impl DrumMachine {
         self.sources.insert(key, path);
     }
 
-    pub fn play_source(&self, key: char) {
+    pub fn play_source(&mut self, key: char) {
         if let Some(path) = self.sources.get(&key) {
             let file = BufReader::new(File::open(path).unwrap());
             let source = Decoder::new(file).unwrap();

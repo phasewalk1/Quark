@@ -1,75 +1,5 @@
-use std::{io::Stderr, path::PathBuf};
-
 use crossterm::event::KeyCode;
-use ratatui::{
-    layout::Alignment,
-    prelude::{Backend, Buffer, CrosstermBackend, Rect},
-    style::{Color, Style},
-    text::{Line, Span},
-    widgets::{Paragraph, Widget},
-    Frame,
-};
-
-#[derive(Clone)]
-pub struct TextInput {
-    pub content: String,
-    pub cursor: usize,
-    pub focused: bool,
-}
-
-impl Default for TextInput {
-    fn default() -> Self {
-        TextInput {
-            content: String::new(),
-            cursor: 0,
-            focused: false,
-        }
-    }
-}
-
-impl TextInput {
-    pub fn handle_event(&mut self, key: KeyCode) {
-        match key {
-            KeyCode::Char(c) => {
-                self.content.insert(self.cursor, c);
-                self.cursor += 1;
-            }
-            KeyCode::Backspace => {
-                if self.cursor > 0 {
-                    self.content.remove(self.cursor - 1);
-                    self.cursor -= 1;
-                }
-            }
-            KeyCode::Delete => {
-                if self.cursor < self.content.len() {
-                    self.content.remove(self.cursor);
-                }
-            }
-            KeyCode::Left => {
-                if self.cursor > 0 {
-                    self.cursor -= 1;
-                }
-            }
-            KeyCode::Right => {
-                if self.cursor < self.content.len() {
-                    self.cursor += 1;
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-// impl widget trait
-impl Widget for TextInput {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let cursor_symbol = if self.focused { "_" } else { " " };
-        let rendered_text = format!("{}{}", &self.content[..self.cursor], cursor_symbol);
-        let text_span = Span::styled(rendered_text, Style::default().fg(Color::White));
-        let line = Line::from(vec![text_span]);
-        buf.set_line(area.x, area.y, &line, area.width);
-    }
-}
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct FileBrowser {
@@ -81,7 +11,6 @@ pub struct FileBrowser {
 impl Default for FileBrowser {
     fn default() -> Self {
         let current_path = std::env::current_dir().unwrap();
-        // get all file entries in current path
         let entries: Vec<PathBuf> = current_path
             .read_dir()
             .unwrap()
@@ -138,6 +67,28 @@ impl FileBrowser {
         self.entries.get(self.selected_index).cloned()
     }
 
+    pub fn selected_is_audio(&self) -> bool {
+        let selected = self.selected_path().unwrap();
+        match selected.extension() {
+            Some(ext) => {
+                return ext == "mp3" || ext == "wav" || ext == "ogg";
+            }
+            None => {
+                return false;
+            }
+        }
+    }
+
+    pub fn selected_file(&self) -> String {
+        self.selected_path()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
+    }
+
     pub fn handle_event(&mut self, key: KeyCode) {
         match key {
             KeyCode::Up => {
@@ -151,8 +102,12 @@ impl FileBrowser {
                 }
             }
             KeyCode::Enter => {
-                self.traverse_into(self.selected_index);
-                self.selected_index = 0;
+                if self.selected_is_audio() {
+                    return;
+                } else {
+                    self.traverse_into(self.selected_index);
+                    self.selected_index = 0;
+                }
             }
             KeyCode::Tab => {
                 self.backtrack(self.selected_index);

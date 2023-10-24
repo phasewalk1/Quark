@@ -1,8 +1,6 @@
 use crate::state::{App, Screen};
 use ratatui::{
-    prelude::{
-        Alignment, Backend, Color, Constraint, Direction, Layout, Span, Style, Styled, Text,
-    },
+    prelude::{Alignment, Backend, Color, Constraint, Direction, Layout, Span, Style},
     text::Line,
     widgets::{Block, Borders, Paragraph},
     Frame,
@@ -12,17 +10,17 @@ pub fn render_ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     match app.screen {
         Screen::Home => {}
         Screen::Exiting => {}
-        Screen::AddSample => {
-            render_add_sample_screen(frame, app);
-        }
+        Screen::AddSample => {}
         Screen::FileBrowser => {
             render_file_browser(frame, app);
         }
-        Screen::KeyBinding => {}
+        Screen::KeyBinding => {
+            render_keybind_screen(frame, app);
+        }
     }
 }
 
-fn render_add_sample_screen<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
+fn render_keybind_screen<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     let area = frame.size();
 
     let chunks = Layout::default()
